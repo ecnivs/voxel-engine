@@ -1,5 +1,5 @@
 <h1 align="center">Voxel Engine</h1>
-<p align="center"><em>Voxel renderer with pygame</em></p>
+<p align="center"><em>Dogfood voxel engine written in Olive.</em></p>
 
 <div align="center">
 
