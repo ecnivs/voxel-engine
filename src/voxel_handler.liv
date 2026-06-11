@@ -1,10 +1,9 @@
 from settings import *
-from world_objects.chunk import Chunk
 import py "glm" as glm
 
 struct VoxelHandler:
     app: &mut VoxelEngine
-    chunks: &mut [Chunk]
+    world_voxels: &[bytes]
     chunk_index: int
     voxel_id: int
     voxel_index: int
@@ -13,9 +12,9 @@ struct VoxelHandler:
     voxel_normal: PyObject
 
 impl VoxelHandler:
-    fn __init__(self, app: &mut VoxelEngine, chunks: &mut [Chunk]):
+    fn __init__(self, app: &mut VoxelEngine, world_voxels: &[bytes]):
         self.app = app
-        self.chunks = chunks
+        self.world_voxels = world_voxels
         self.chunk_index = 0
         self.voxel_id = 0
         self.voxel_index = 0
@@ -132,15 +131,14 @@ impl VoxelHandler:
 
         if 0 <= cx and cx < (WORLD_W as int) and 0 <= cy and cy < (WORLD_H as int) and 0 <= cz and cz < (WORLD_D as int):
             let chunk_index = cx + (WORLD_W as int) * cz + (WORLD_AREA as int) * cy
-            let chunk = &self.chunks[chunk_index]
+            if len(self.world_voxels[chunk_index]) != 0:
+                let lx = wx - cx * (CHUNK_SIZE as int)
+                let ly = wy - cy * (CHUNK_SIZE as int)
+                let lz = wz - cz * (CHUNK_SIZE as int)
 
-            let lx = wx - cx * (CHUNK_SIZE as int)
-            let ly = wy - cy * (CHUNK_SIZE as int)
-            let lz = wz - cz * (CHUNK_SIZE as int)
+                let voxel_index = lx + (CHUNK_SIZE as int) * lz + (CHUNK_AREA as int) * ly
+                let voxel_id = self.world_voxels[chunk_index][voxel_index]
 
-            let voxel_index = lx + (CHUNK_SIZE as int) * lz + (CHUNK_AREA as int) * ly
-            let voxel_id = chunk.voxels[voxel_index] as int
-
-            return (voxel_id, voxel_index, (lx, ly, lz), chunk_index)
+                return (voxel_id, voxel_index, (lx, ly, lz), chunk_index)
 
         (0, 0, (0, 0, 0), 0)

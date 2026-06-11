@@ -1,7 +1,5 @@
 from meshes.base_mesh import BaseMesh
 
-import py "numpy" as np
-
 struct CubeMesh:
     base: BaseMesh
 
@@ -12,37 +10,48 @@ impl CubeMesh:
         let vertex_data = self.get_vertex_data()
         self.base = BaseMesh(ctx, program, '2f2 3f2', vertex_data, 'in_tex_coord_0', 'in_position')
 
-    fn get_data(self: &CubeMesh, vertices: [Any], indices: [Any]) -> PyObject:
-        let data = [vertices[ind] for triangle in indices for ind in triangle]
-        np.array(data, dtype='float16')
-
-    fn get_vertex_data(self: &CubeMesh) -> PyObject:
+    fn get_vertex_data(self: &CubeMesh) -> bytes:
         let vertices = [
-            (0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1),
-            (0, 1, 0), (0, 0, 0), (1, 0, 0), (1, 1, 0)
+            0,0,1, 1,0,1, 1,1,1, 0,1,1,
+            0,1,0, 0,0,0, 1,0,0, 1,1,0
         ]
         let indices = [
-            (0, 2, 3), (0, 1, 2),
-            (1, 7, 2), (1, 6, 7),
-            (6, 5, 4), (4, 7, 6),
-            (3, 4, 5), (3, 5, 0),
-            (3, 7, 4), (3, 2, 7),
-            (0, 6, 1), (0, 5, 6)
+            0,2,3, 0,1,2,
+            1,7,2, 1,6,7,
+            6,5,4, 4,7,6,
+            3,4,5, 3,5,0,
+            3,7,4, 3,2,7,
+            0,6,1, 0,5,6
         ]
-        let vertex_data = self.get_data(vertices, indices)
-
-        let tex_coord_vertices = [(0, 0), (1, 0), (1, 1), (0, 1)]
-        let tex_coord_indices = [
-            (0, 2, 3), (0, 1, 2),
-            (0, 2, 3), (0, 1, 2),
-            (0, 1, 2), (2, 3, 0),
-            (2, 3, 0), (2, 0, 1),
-            (0, 2, 3), (0, 1, 2),
-            (3, 1, 2), (3, 0, 1)
+        let tex_coords = [
+            0,0, 1,0, 1,1, 0,1
         ]
-        let tex_coord_data = self.get_data(tex_coord_vertices, tex_coord_indices)
-
-        np.hstack([tex_coord_data, vertex_data])
+        let tex_indices = [
+            0,2,3, 0,1,2,
+            0,2,3, 0,1,2,
+            0,1,2, 2,3,0,
+            2,3,0, 2,0,1,
+            0,2,3, 0,1,2,
+            3,1,2, 3,0,1
+        ]
+        let mut out = bytes_new(0)
+        let mut i = 0
+        while i < 36:
+            let ti = tex_indices[i]
+            push_f16(&mut out, tex_coords[ti * 2])
+            push_f16(&mut out, tex_coords[ti * 2 + 1])
+            let vi = indices[i]
+            push_f16(&mut out, vertices[vi * 3])
+            push_f16(&mut out, vertices[vi * 3 + 1])
+            push_f16(&mut out, vertices[vi * 3 + 2])
+            i = i + 1
+        out
 
     fn render(self: &CubeMesh):
         self.base.render()
+
+fn push_f16(out: &mut bytes, unit: int):
+    if unit == 0:
+        bytes_push_u16_le(out, 0)
+    else:
+        bytes_push_u16_le(out, 15360)

@@ -1,13 +1,223 @@
 from settings import *
 
-import py "src.build_chunk_mesh" as py_builder
-
-let build_chunk_mesh = py_builder.build_chunk_mesh
-
 fn get_chunk_index(position: (int, int, int)) -> int:
     let cx = position[0] / (CHUNK_SIZE as int)
     let cy = position[1] / (CHUNK_SIZE as int)
     let cz = position[2] / (CHUNK_SIZE as int)
+    chunk_index_at(cx, cy, cz)
+
+fn chunk_index_at(cx: int, cy: int, cz: int) -> int:
     if 0 <= cx and cx < (WORLD_W as int) and 0 <= cy and cy < (WORLD_H as int) and 0 <= cz and cz < (WORLD_D as int):
         return cx + (WORLD_W as int) * cz + (WORLD_AREA as int) * cy
     -1
+
+fn face_normals_table() -> [int]:
+    [
+        0, 1, 0,
+        0, -1, 0,
+        1, 0, 0,
+        -1, 0, 0,
+        0, 0, -1,
+        0, 0, 1
+    ]
+
+fn face_verts_table() -> [int]:
+    [
+        0,1,0, 0,1,1, 1,1,1, 0,1,0, 1,1,1, 1,1,0,
+        0,0,0, 1,0,1, 0,0,1, 0,0,0, 1,0,0, 1,0,1,
+        1,0,0, 1,1,0, 1,1,1, 1,0,0, 1,1,1, 1,0,1,
+        0,0,0, 0,1,1, 0,1,0, 0,0,0, 0,0,1, 0,1,1,
+        0,0,0, 0,1,0, 1,1,0, 0,0,0, 1,1,0, 1,0,0,
+        0,0,1, 1,1,1, 0,1,1, 0,0,1, 1,0,1, 1,1,1
+    ]
+
+fn ao_dirs_table() -> [int]:
+    [
+        -1,0,0, 0,0,-1, -1,0,-1,
+        -1,0,0, 0,0,1, -1,0,1,
+        1,0,0, 0,0,1, 1,0,1,
+        1,0,0, 0,0,-1, 1,0,-1,
+
+        0,-1,0, 0,0,-1, 0,-1,-1,
+        0,1,0, 0,0,-1, 0,1,-1,
+        0,1,0, 0,0,1, 0,1,1,
+        0,-1,0, 0,0,1, 0,-1,1,
+
+        -1,0,0, 0,-1,0, -1,-1,0,
+        -1,0,0, 0,1,0, -1,1,0,
+        1,0,0, 0,1,0, 1,1,0,
+        1,0,0, 0,-1,0, 1,-1,0
+    ]
+
+fn ao_offsets_table(normals: &[int]) -> [int]:
+    let dirs = ao_dirs_table()
+    let mut t: [int] = list_new(216)
+    let mut face = 0
+    while face < 6:
+        let nx = normals[face * 3]
+        let ny = normals[face * 3 + 1]
+        let nz = normals[face * 3 + 2]
+        let mut axis = 2
+        if face < 2:
+            axis = 0
+        elif face < 4:
+            axis = 1
+        let mut ci = 0
+        while ci < 4:
+            let mut si = 0
+            while si < 3:
+                let src = axis * 36 + ci * 9 + si * 3
+                let dst = face * 36 + ci * 9 + si * 3
+                t[dst] = nx + dirs[src]
+                t[dst + 1] = ny + dirs[src + 1]
+                t[dst + 2] = nz + dirs[src + 2]
+                si = si + 1
+            ci = ci + 1
+        face = face + 1
+    t
+
+fn vert_corner_table(fv: &[int]) -> [int]:
+    let mut t: [int] = list_new(36)
+    let mut ux: [int] = list_new(4)
+    let mut uy: [int] = list_new(4)
+    let mut uz: [int] = list_new(4)
+    let mut face = 0
+    while face < 6:
+        let mut count = 0
+        let mut vi = 0
+        while vi < 6:
+            let base = face * 18 + vi * 3
+            let vx = fv[base]
+            let vy = fv[base + 1]
+            let vz = fv[base + 2]
+            let mut found = -1
+            let mut k = 0
+            while k < count:
+                if ux[k] == vx and uy[k] == vy and uz[k] == vz:
+                    found = k
+                k = k + 1
+            if found < 0:
+                ux[count] = vx
+                uy[count] = vy
+                uz[count] = vz
+                found = count
+                count = count + 1
+            t[face * 6 + vi] = found
+            vi = vi + 1
+        face = face + 1
+    t
+
+fn is_solid(voxels: &bytes, x: int, y: int, z: int, cs: int, ca: int) -> int:
+    if x < 0 or x >= cs or y < 0 or y >= cs or z < 0 or z >= cs:
+        return 0
+    if voxels[x + cs * z + ca * y] != 0:
+        return 1
+    0
+
+fn ao_at(ao0: int, ao1: int, ao2: int, ao3: int, idx: int) -> int:
+    if idx == 0:
+        return ao0
+    if idx == 1:
+        return ao1
+    if idx == 2:
+        return ao2
+    ao3
+
+fn build_chunk_mesh(world_voxels: &mut [bytes], chunk_index: int, px: int, py_c: int, pz: int) -> bytes:
+    let cs = CHUNK_SIZE as int
+    let ca = cs * cs
+
+    let normals = face_normals_table()
+    let fv = face_verts_table()
+    let ao_offs = ao_offsets_table(&normals)
+    let vci = vert_corner_table(&fv)
+
+    let mut out = bytes_new(0)
+    if len(world_voxels[chunk_index]) == 0:
+        return out
+
+    let voxels = &world_voxels[chunk_index]
+
+    let mut y = 0
+    while y < cs:
+        let mut z = 0
+        while z < cs:
+            let mut x = 0
+            while x < cs:
+                let vid = voxels[x + cs * z + ca * y]
+                if vid != 0:
+                    let mut face = 0
+                    while face < 6:
+                        let nx = normals[face * 3]
+                        let ny = normals[face * 3 + 1]
+                        let nz = normals[face * 3 + 2]
+                        let ax = x + nx
+                        let ay = y + ny
+                        let az = z + nz
+
+                        let mut neighbor_solid = 0
+                        if 0 <= ax and ax < cs and 0 <= ay and ay < cs and 0 <= az and az < cs:
+                            if voxels[ax + cs * az + ca * ay] != 0:
+                                neighbor_solid = 1
+                        else:
+                            let nci = chunk_index_at(px + nx, py_c + ny, pz + nz)
+                            if nci >= 0:
+                                if len(world_voxels[nci]) != 0:
+                                    let lx = ((ax % cs) + cs) % cs
+                                    let ly = ((ay % cs) + cs) % cs
+                                    let lz = ((az % cs) + cs) % cs
+                                    if world_voxels[nci][lx + cs * lz + ca * ly] != 0:
+                                        neighbor_solid = 1
+
+                        if neighbor_solid == 0:
+                            let mut ao0 = 0
+                            let mut ao1 = 0
+                            let mut ao2 = 0
+                            let mut ao3 = 0
+                            let mut ci = 0
+                            while ci < 4:
+                                let base = face * 36 + ci * 9
+                                let s0 = is_solid(voxels, x + ao_offs[base], y + ao_offs[base + 1], z + ao_offs[base + 2], cs, ca)
+                                let s1 = is_solid(voxels, x + ao_offs[base + 3], y + ao_offs[base + 4], z + ao_offs[base + 5], cs, ca)
+                                let s2 = is_solid(voxels, x + ao_offs[base + 6], y + ao_offs[base + 7], z + ao_offs[base + 8], cs, ca)
+                                let mut ao = 3 - s0 - s1
+                                if s2 != 0 and (s0 == 0 or s1 == 0):
+                                    ao = ao - 1
+                                if ao < 0:
+                                    ao = 0
+                                if ci == 0:
+                                    ao0 = ao
+                                elif ci == 1:
+                                    ao1 = ao
+                                elif ci == 2:
+                                    ao2 = ao
+                                else:
+                                    ao3 = ao
+                                ci = ci + 1
+
+                            let c0 = vci[face * 6]
+                            let c1 = vci[face * 6 + 1]
+                            let c2 = vci[face * 6 + 2]
+                            let mut c3 = vci[face * 6 + 5]
+                            if face % 2 == 1:
+                                c3 = vci[face * 6 + 4]
+
+                            let mut flip = 0
+                            if ao_at(ao0, ao1, ao2, ao3, c1) + ao_at(ao0, ao1, ao2, ao3, c3) > ao_at(ao0, ao1, ao2, ao3, c0) + ao_at(ao0, ao1, ao2, ao3, c2):
+                                flip = 1
+
+                            let mut vi = 0
+                            while vi < 6:
+                                let vbase = face * 18 + vi * 3
+                                let wx = x + fv[vbase]
+                                let wy = y + fv[vbase + 1]
+                                let wz = z + fv[vbase + 2]
+                                let ao_v = ao_at(ao0, ao1, ao2, ao3, vci[face * 6 + vi])
+                                let packed = (wx << 26) | (wy << 20) | (wz << 14) | (vid << 6) | (face << 3) | (ao_v << 1) | flip
+                                bytes_push_u32_le(out, packed)
+                                vi = vi + 1
+                        face = face + 1
+                x = x + 1
+            z = z + 1
+        y = y + 1
+    out

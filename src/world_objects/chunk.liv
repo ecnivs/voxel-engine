@@ -1,29 +1,28 @@
 from settings import *
 from meshes.chunk_mesh import ChunkMesh
+from meshes.chunk_mesh_builder import chunk_index_at
 from terrain_gen import set_voxel_id, get_height
 from noise import NoiseState
 
 import py "glm" as glm
-import py "numpy" as np
-import py "src.build_chunk_mesh" as bm_store
 
 struct Chunk:
     app: &mut VoxelEngine
-    world_voxels: PyObject
+    world_voxels: &mut [bytes]
     position: (int, int, int)
+    chunk_index: int
     m_model: PyObject
-    voxels: PyObject
     mesh: ChunkMesh
     is_empty: bool
     center: PyObject
 
 impl Chunk:
-    fn __init__(self, app: &mut VoxelEngine, world_voxels: PyObject, position: (int, int, int)):
+    fn __init__(self, app: &mut VoxelEngine, world_voxels: &mut [bytes], position: (int, int, int)):
         self.app = app
         self.world_voxels = world_voxels
         self.position = position
+        self.chunk_index = chunk_index_at(position[0], position[1], position[2])
         self.m_model = self.get_model_matrix()
-        self.voxels = None
         self.mesh = None
         self.is_empty = True
         let px = position[0] as float
@@ -48,18 +47,21 @@ impl Chunk:
             self.set_uniform()
             self.mesh.render()
 
-    fn build_voxels(self: &mut Chunk, noise: &NoiseState) -> PyObject:
-        let voxels = np.zeros(CHUNK_VOL as int, dtype='int32')
+    fn build_voxels(self: &mut Chunk, noise: &NoiseState):
+        let mut voxels = bytes_new(CHUNK_VOL as int)
         let cx = self.position[0] * (CHUNK_SIZE as int)
         let cy = self.position[1] * (CHUNK_SIZE as int)
         let cz = self.position[2] * (CHUNK_SIZE as int)
-        self.generate_terrain(noise, voxels, cx, cy, cz)
-        if np.count_nonzero(voxels) != 0:
-            self.is_empty = False
-        bm_store.store_voxels(self.position[0], self.position[1], self.position[2], voxels)
-        voxels
+        self.generate_terrain(noise, &mut voxels, cx, cy, cz)
+        let mut i = 0
+        while i < (CHUNK_VOL as int) and self.is_empty:
+            if voxels[i] != 0:
+                self.is_empty = False
+            i = i + 1
+        if self.is_empty == False:
+            self.world_voxels[self.chunk_index] = voxels
 
-    fn generate_terrain(self: &Chunk, noise: &NoiseState, voxels: PyObject, cx: int, cy: int, cz: int):
+    fn generate_terrain(self: &Chunk, noise: &NoiseState, voxels: &mut bytes, cx: int, cy: int, cz: int):
         let mut x = 0
         while x < (CHUNK_SIZE as int):
             let wx = x + cx

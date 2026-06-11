@@ -1,3 +1,5 @@
+import py "builtins" as builtins
+
 struct BaseMesh:
     ctx: PyObject
     program: PyObject
@@ -8,26 +10,28 @@ struct BaseMesh:
     vbo: PyObject
 
 impl BaseMesh:
-    fn __init__(self, ctx: PyObject, program: PyObject, vbo_format: str, vertex_data: PyObject, attr1: str, attr2: str):
+    fn __init__(self, ctx: PyObject, program: PyObject, vbo_format: str, vertex_data: bytes, attr1: str, attr2: str):
         self.ctx = ctx
         self.program = program
         self.vbo_format = vbo_format
         self.attr1 = attr1
         self.attr2 = attr2
         self.vbo = self.ctx.buffer(vertex_data)
-        import py "src.build_chunk_mesh" as _bm
-        if attr2 != '':
-            self.vao = _bm.create_vao2(self.ctx, self.program, self.vbo, self.vbo_format, self.attr1, self.attr2)
-        else:
-            self.vao = _bm.create_vao(self.ctx, self.program, self.vbo, self.vbo_format, self.attr1)
+        self.vao = self.create_vao()
 
-    fn rebuild(self: &mut BaseMesh, vertex_data: PyObject):
-        self.vbo = self.ctx.buffer(vertex_data)
-        import py "src.build_chunk_mesh" as _bm
+    fn create_vao(self: &mut BaseMesh) -> PyObject:
+        let mut item: PyObject = None
         if self.attr2 != '':
-            self.vao = _bm.create_vao2(self.ctx, self.program, self.vbo, self.vbo_format, self.attr1, self.attr2)
+            item = builtins.tuple([self.vbo, self.vbo_format, self.attr1, self.attr2])
         else:
-            self.vao = _bm.create_vao(self.ctx, self.program, self.vbo, self.vbo_format, self.attr1)
+            item = builtins.tuple([self.vbo, self.vbo_format, self.attr1])
+        let content = builtins.list()
+        content.append(item)
+        self.ctx.vertex_array(self.program, content, skip_errors=True)
+
+    fn rebuild(self: &mut BaseMesh, vertex_data: bytes):
+        self.vbo = self.ctx.buffer(vertex_data)
+        self.vao = self.create_vao()
 
     fn render(self: &BaseMesh):
         self.vao.render()

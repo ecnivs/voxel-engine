@@ -36,7 +36,7 @@ fn get_height(noise: &NoiseState, x: int, z: int) -> int:
 fn get_index(x: int, y: int, z: int) -> int:
     x + (CHUNK_SIZE as int) * z + (CHUNK_AREA as int) * y
 
-fn set_voxel_id(noise: &NoiseState, voxels: PyObject, x: int, y: int, z: int, wx: int, wy: int, wz: int, world_height: int):
+fn set_voxel_id(noise: &NoiseState, voxels: &mut bytes, x: int, y: int, z: int, wx: int, wy: int, wz: int, world_height: int):
     let mut voxel_id: int = 0
     if wy < world_height - 1:
         let n3 = noise3(noise, wx as float * 0.09, wy as float * 0.09, wz as float * 0.09)
@@ -64,7 +64,7 @@ fn set_voxel_id(noise: &NoiseState, voxels: PyObject, x: int, y: int, z: int, wx
     if wy < (DIRT_LVL as int):
         place_tree(voxels, x, y, z, voxel_id)
 
-fn place_tree(voxels: PyObject, x: int, y: int, z: int, voxel_id: int):
+fn place_tree(voxels: &mut bytes, x: int, y: int, z: int, voxel_id: int):
     if voxel_id != (GRASS as int) or random.random() > (TREE_PROBABILITY as float):
         return
     if y + (TREE_HEIGHT as int) >= (CHUNK_SIZE as int):

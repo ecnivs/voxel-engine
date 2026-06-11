@@ -1,5 +1,4 @@
 pygame
 moderngl
 pyglm
-numpy
 Pillow

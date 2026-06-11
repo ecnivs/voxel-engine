@@ -1,7 +1,5 @@
 from meshes.base_mesh import BaseMesh
 
-import py "numpy" as np
-
 struct QuadMesh:
     base: BaseMesh
 
@@ -12,18 +10,21 @@ impl QuadMesh:
         let vertex_data = self.get_vertex_data()
         self.base = BaseMesh(ctx, program, '2u1 3u1', vertex_data, 'in_tex_coord', 'in_position')
 
-    fn get_vertex_data(self: &QuadMesh) -> PyObject:
-        let vertices = np.array([
-            (0, 0, 0), (1, 0, 1), (1, 0, 0),
-            (0, 0, 0), (0, 0, 1), (1, 0, 1)
-        ], dtype='uint8')
-
-        let tex_coords = np.array([
-            (0, 0), (1, 1), (1, 0),
-            (0, 0), (0, 1), (1, 1)
-        ], dtype='uint8')
-
-        np.hstack([tex_coords, vertices])
+    fn get_vertex_data(self: &QuadMesh) -> bytes:
+        let rows = [
+            0,0, 0,0,0,
+            1,1, 1,0,1,
+            1,0, 1,0,0,
+            0,0, 0,0,0,
+            0,1, 0,0,1,
+            1,1, 1,0,1
+        ]
+        let mut out = bytes_new(0)
+        let mut i = 0
+        while i < len(rows):
+            bytes_push(out, rows[i])
+            i = i + 1
+        out
 
     fn render(self: &QuadMesh):
         self.base.render()
