@@ -25,9 +25,11 @@ A voxel engine written in [Olive](https://github.com/olive-language/olive). This
 
 Olive handles all the game logic. Rendering goes through pygame and moderngl via `import py`. Noise generation is a native Olive implementation of OpenSimplex2 (no Python noise libraries needed).
 
+Features include infinite-style world generation, chunk-based terrain with biomes, first-person controls with block add/remove/switch, ray casting for block interaction, a crosshair and voxel marker highlight, and configurable settings.
+
 
 ## Prerequisites
-* Olive >= 0.1.21
+* Olive >= 0.1.22
 * Python 3.x (with dependencies in `requirements.txt`)
 
 ## Installation
@@ -57,13 +59,16 @@ pit run
 
 ## Controls
 
-| Key | Action |
-|-----|--------|
+| Key/Mouse | Action |
+|-----------|--------|
 | W/A/S/D | Move |
 | Space | Up |
 | Left Ctrl | Down |
 | Left Shift | Sprint |
 | Mouse | Look |
+| Left Click | Remove block |
+| Right Click | Place block |
+| 1-7 | Select block type (Sand/Grass/Dirt/Stone/Snow/Leaves/Wood) |
 | F12 | Screenshot |
 | Escape | Quit |
 
