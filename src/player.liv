@@ -3,6 +3,7 @@ from camera import Camera
 
 import py "pygame" as pg
 import py "operator" as op
+import py "glm" as glm
 
 struct Player:
     app: &mut VoxelEngine
@@ -94,7 +95,8 @@ impl Player:
             self.camera.position = op.add(self.camera.position, op.mul(self.camera.right, move_vel))
         if self.a_down:
             self.camera.position = op.sub(self.camera.position, op.mul(self.camera.right, move_vel))
+        let world_up = glm.vec3(0, 1, 0)
         if self.space_down:
-            self.camera.position = op.add(self.camera.position, op.mul(self.camera.up, move_vel))
+            self.camera.position = op.add(self.camera.position, op.mul(world_up, move_vel))
         if self.ctrl_down:
-            self.camera.position = op.sub(self.camera.position, op.mul(self.camera.up, move_vel))
+            self.camera.position = op.sub(self.camera.position, op.mul(world_up, move_vel))
