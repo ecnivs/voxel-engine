@@ -209,11 +209,19 @@ fn build_chunk_mesh(world_voxels: &mut [bytes], chunk_index: int, px: int, py_c:
                                     ao = ao - 1
                                 if ao < 0:
                                     ao = 0
-                                if ci == 0:
+                                // odd faces wind opposite: corner ids 1 and 2
+                                // enumerate in swapped geometric order
+                                let mut corner = ci
+                                if face % 2 == 1:
+                                    if ci == 1:
+                                        corner = 2
+                                    elif ci == 2:
+                                        corner = 1
+                                if corner == 0:
                                     ao0 = ao
-                                elif ci == 1:
+                                elif corner == 1:
                                     ao1 = ao
-                                elif ci == 2:
+                                elif corner == 2:
                                     ao2 = ao
                                 else:
                                     ao3 = ao
