@@ -107,6 +107,28 @@ fn vert_corner_table(fv: &[int]) -> [int]:
         face = face + 1
     t
 
+fn corner_coords_table(fv: &[int], vci: &[int]) -> [int]:
+    let mut t: [int] = list_new(72)
+    let mut face = 0
+    while face < 6:
+        let mut vi = 0
+        while vi < 6:
+            let c = vci[face * 6 + vi]
+            t[face * 12 + c * 3] = fv[face * 18 + vi * 3]
+            t[face * 12 + c * 3 + 1] = fv[face * 18 + vi * 3 + 1]
+            t[face * 12 + c * 3 + 2] = fv[face * 18 + vi * 3 + 2]
+            vi = vi + 1
+        face = face + 1
+    t
+
+fn emit_seq_table() -> [int]:
+    [
+        0, 1, 2, 0, 2, 3,  // even face
+        0, 1, 2, 0, 3, 1,  // odd face
+        3, 0, 1, 3, 1, 2,  // even flipped face
+        3, 2, 0, 3, 1, 2   // odd flipped face
+    ]
+
 fn is_solid(voxels: &bytes, x: int, y: int, z: int, cs: int, ca: int) -> int:
     if x < 0 or x >= cs or y < 0 or y >= cs or z < 0 or z >= cs:
         return 0
@@ -131,6 +153,8 @@ fn build_chunk_mesh(world_voxels: &mut [bytes], chunk_index: int, px: int, py_c:
     let fv = face_verts_table()
     let ao_offs = ao_offsets_table(&normals)
     let vci = vert_corner_table(&fv)
+    let cc = corner_coords_table(&fv, &vci)
+    let seq = emit_seq_table()
 
     let mut out = bytes_new(0)
     if len(world_voxels[chunk_index]) == 0:
@@ -206,13 +230,15 @@ fn build_chunk_mesh(world_voxels: &mut [bytes], chunk_index: int, px: int, py_c:
                             if ao_at(ao0, ao1, ao2, ao3, c1) + ao_at(ao0, ao1, ao2, ao3, c3) > ao_at(ao0, ao1, ao2, ao3, c0) + ao_at(ao0, ao1, ao2, ao3, c2):
                                 flip = 1
 
+                            let seq_base = ((face % 2) + flip * 2) * 6
                             let mut vi = 0
                             while vi < 6:
-                                let vbase = face * 18 + vi * 3
-                                let wx = x + fv[vbase]
-                                let wy = y + fv[vbase + 1]
-                                let wz = z + fv[vbase + 2]
-                                let ao_v = ao_at(ao0, ao1, ao2, ao3, vci[face * 6 + vi])
+                                let corner = seq[seq_base + vi]
+                                let cbase = face * 12 + corner * 3
+                                let wx = x + cc[cbase]
+                                let wy = y + cc[cbase + 1]
+                                let wz = z + cc[cbase + 2]
+                                let ao_v = ao_at(ao0, ao1, ao2, ao3, corner)
                                 let packed = (wx << 26) | (wy << 20) | (wz << 14) | (vid << 6) | (face << 3) | (ao_v << 1) | flip
                                 bytes_push_u32_le(out, packed)
                                 vi = vi + 1
