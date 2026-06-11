@@ -8,6 +8,7 @@ struct ShaderProgram:
     voxel_marker: PyObject
     water: PyObject
     clouds: PyObject
+    crosshair: PyObject
 
 impl ShaderProgram:
     fn __init__(self, engine: &mut VoxelEngine):
@@ -18,6 +19,7 @@ impl ShaderProgram:
         self.voxel_marker = self.get_program(shader_name='voxel_marker')
         self.water = self.get_program(shader_name='water')
         self.clouds = self.get_program(shader_name='clouds')
+        self.crosshair = self.get_program(shader_name='crosshair')
 
         self.set_uniforms_on_init()
 
@@ -41,6 +43,12 @@ impl ShaderProgram:
         self.clouds['center'] = CENTER_XZ
         self.clouds['bg_color'].write(BG_COLOR)
         self.clouds['cloud_scale'] = CLOUD_SCALE
+
+        // 2 px per grid unit: 36 px long arms, 4 px thick bars.
+        let px_per_unit = 2.0
+        let sx = 2.0 * px_per_unit / (WIN_RES.x as float)
+        let sy = 2.0 * px_per_unit / (WIN_RES.y as float)
+        self.crosshair['u_scale'].write(glm.vec2(sx, sy))
 
     fn update(self: &mut ShaderProgram):
         self.chunk['m_view'].write(self.engine.player.camera.m_view)

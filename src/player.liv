@@ -33,7 +33,15 @@ impl Player:
         self.camera.update()
 
     fn handle_event(self: &mut Player, event: PyObject):
+        if event.type == pg.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                self.app.scene.world.voxel_handler.remove_voxel()
+            if event.button == 3:
+                self.app.scene.world.voxel_handler.add_voxel()
+
         if event.type == pg.KEYDOWN:
+            if event.key >= pg.K_1 and event.key <= pg.K_7:
+                self.app.scene.world.voxel_handler.new_voxel_id = (event.key - pg.K_0) as int
             if event.key == pg.K_w:
                 self.w_down = True
             if event.key == pg.K_s:

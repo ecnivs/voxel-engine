@@ -19,10 +19,24 @@ impl World:
         let mut voxels: [bytes] = list_new(WORLD_VOL as int)
         self.voxels = voxels
         self.build_chunks()
-        self.voxel_handler = VoxelHandler(app, &self.voxels)
+        self.voxel_handler = VoxelHandler(app, &mut self.voxels)
 
     fn update(self: &mut World):
         self.voxel_handler.update()
+        self.process_rebuilds()
+
+    fn process_rebuilds(self: &mut World):
+        let mut i = 0
+        while i < self.voxel_handler.rebuild_count:
+            let chunk_index = self.voxel_handler.rebuild_queue[i]
+            let chunk_ref = &mut self.chunks[chunk_index]
+            if chunk_ref.is_empty:
+                chunk_ref.is_empty = False
+                chunk_ref.build_mesh()
+            else:
+                chunk_ref.mesh.rebuild()
+            i = i + 1
+        self.voxel_handler.rebuild_count = 0
 
     fn build_chunks(self: &mut World):
         let mut x = 0
