@@ -29,7 +29,7 @@ Features include infinite-style world generation, chunk-based terrain with biome
 
 
 ## Prerequisites
-* Olive >= 0.1.22
+* Olive >= 0.1.23
 * Python 3.x (with dependencies in `requirements.txt`)
 
 ## Installation
