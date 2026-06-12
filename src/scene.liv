@@ -3,6 +3,7 @@ from world_objects.clouds import Clouds
 from world_objects.water import Water
 from world_objects.voxel_marker import VoxelMarker
 from meshes.crosshair_mesh import CrosshairMesh
+from meshes.hotbar_mesh import HotbarMesh
 
 import py "moderngl" as mgl
 
@@ -12,6 +13,7 @@ struct Scene:
     water: Water
     voxel_marker: VoxelMarker
     crosshair: CrosshairMesh
+    hotbar: HotbarMesh
 
 impl Scene:
     fn __init__(self, app: &mut VoxelEngine):
@@ -20,6 +22,7 @@ impl Scene:
         self.water = Water(app)
         self.voxel_marker = VoxelMarker(&mut self.world.voxel_handler)
         self.crosshair = CrosshairMesh(app)
+        self.hotbar = HotbarMesh(app)
 
     fn update(self: &mut Scene):
         self.world.update()
@@ -33,14 +36,15 @@ impl Scene:
         self.water.render()
         self.water.app.ctx.enable(mgl.CULL_FACE)
         self.voxel_marker.render()
-        self.render_crosshair()
+        self.render_ui()
 
-    fn render_crosshair(self: &mut Scene):
+    fn render_ui(self: &mut Scene):
         let ctx = self.water.app.ctx
         ctx.disable(mgl.DEPTH_TEST)
 
-        // Invert whatever is behind the crosshair, Minecraft style.
         ctx.blend_func = (mgl.ONE_MINUS_DST_COLOR, mgl.ZERO)
         self.crosshair.render()
         ctx.blend_func = mgl.DEFAULT_BLENDING
+
+        self.hotbar.render()
         ctx.enable(mgl.DEPTH_TEST)

@@ -1,0 +1,54 @@
+from meshes.base_mesh import BaseMesh
+
+struct HotbarMesh:
+    base: BaseMesh
+
+impl HotbarMesh:
+    fn __init__(self, app: &mut VoxelEngine):
+        let ctx = app.ctx
+        let program = app.shader_program.hotbar
+        let vertex_data = self.get_vertex_data()
+        self.base = BaseMesh(ctx, program, '2u1 4u1', vertex_data, 'in_position', 'in_aux')
+
+    fn get_vertex_data(self: &HotbarMesh) -> bytes:
+        let mut out = bytes_new(0)
+        let mut slot = 0
+        while slot < 7:
+            let x0 = 1 + slot * 14
+
+            // slot frame
+            push_quad(&mut out, x0, 1, 0, 0, x0 + 12, 1, 1, 0, x0 + 12, 13, 1, 1, x0, 13, 0, 1, 0, slot)
+
+            // selector overlay, drawn only when this slot is selected
+            push_quad(&mut out, x0 - 1, 0, 0, 0, x0 + 13, 0, 1, 0, x0 + 13, 14, 1, 1, x0 - 1, 14, 0, 1, 1, slot)
+            let id = slot + 1
+
+            // top face: T, TL, C, TR diamond
+            push_quad(&mut out, x0 + 6, 12, 1, 1, x0 + 2, 10, 0, 1, x0 + 6, 8, 0, 0, x0 + 10, 10, 1, 0, 8 + id, slot)
+
+            // left face: TL, BL, Bm, C (texture rows start at v=0, so v=0 is up)
+            push_quad(&mut out, x0 + 2, 10, 0, 0, x0 + 2, 4, 0, 1, x0 + 6, 2, 1, 1, x0 + 6, 8, 1, 0, 16 + id, slot)
+
+            // right face: C, Bm, BR, TR
+            push_quad(&mut out, x0 + 6, 8, 0, 0, x0 + 6, 2, 0, 1, x0 + 10, 4, 1, 1, x0 + 10, 10, 1, 0, 24 + id, slot)
+            slot = slot + 1
+        out
+
+    fn render(self: &HotbarMesh):
+        self.base.render()
+
+fn push_quad(out: &mut bytes, ax: int, ay: int, au: int, av: int, bx: int, by: int, bu: int, bv: int, cx: int, cy: int, cu: int, cv: int, dx: int, dy: int, du: int, dv: int, z: int, slot: int):
+    push_vert(out, ax, ay, au, av, z, slot)
+    push_vert(out, bx, by, bu, bv, z, slot)
+    push_vert(out, cx, cy, cu, cv, z, slot)
+    push_vert(out, ax, ay, au, av, z, slot)
+    push_vert(out, cx, cy, cu, cv, z, slot)
+    push_vert(out, dx, dy, du, dv, z, slot)
+
+fn push_vert(out: &mut bytes, x: int, y: int, u: int, v: int, z: int, slot: int):
+    bytes_push(out, x)
+    bytes_push(out, y)
+    bytes_push(out, u)
+    bytes_push(out, v)
+    bytes_push(out, z)
+    bytes_push(out, slot)

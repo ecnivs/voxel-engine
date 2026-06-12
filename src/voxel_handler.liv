@@ -13,6 +13,7 @@ struct VoxelHandler:
     new_voxel_id: int
     rebuild_queue: [int]
     rebuild_count: int
+    break_progress: f64
 
 impl VoxelHandler:
     fn __init__(self, app: &mut VoxelEngine, world_voxels: &mut [bytes]):
@@ -28,9 +29,29 @@ impl VoxelHandler:
         let mut queue: [int] = list_new(8)
         self.rebuild_queue = queue
         self.rebuild_count = 0
+        self.break_progress = 0.0
 
     fn update(self: &mut VoxelHandler):
         self.ray_cast()
+
+    fn is_solid(self: &VoxelHandler, wx: int, wy: int, wz: int) -> bool:
+        if wy < 0:
+            return True
+        if wx < 0 or wz < 0:
+            return False
+        let cx = wx / (CHUNK_SIZE as int)
+        let cy = wy / (CHUNK_SIZE as int)
+        let cz = wz / (CHUNK_SIZE as int)
+        if cx >= (WORLD_W as int) or cy >= (WORLD_H as int) or cz >= (WORLD_D as int):
+            return False
+        let chunk_index = cx + (WORLD_W as int) * cz + (WORLD_AREA as int) * cy
+        if len(self.world_voxels[chunk_index]) == 0:
+            return False
+        let lx = wx - cx * (CHUNK_SIZE as int)
+        let ly = wy - cy * (CHUNK_SIZE as int)
+        let lz = wz - cz * (CHUNK_SIZE as int)
+        let voxel_index = lx + (CHUNK_SIZE as int) * lz + (CHUNK_AREA as int) * ly
+        self.world_voxels[chunk_index][voxel_index] as int != 0
 
     fn queue_rebuild(self: &mut VoxelHandler, chunk_index: int):
         let mut i = 0

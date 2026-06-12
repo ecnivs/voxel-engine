@@ -42,6 +42,20 @@ const PLAYER_ROT_SPEED: f32 = 0.003
 const PLAYER_POS = glm.vec3(CENTER_XZ as int, CHUNK_SIZE as int * 3, CENTER_XZ as int)
 const MOUSE_SENSITIVITY: f32 = 0.001
 
+// Physics. Time unit is milliseconds (delta_time comes from clock.tick).
+const GRAVITY: f64 = 0.000032
+const JUMP_SPEED: f64 = 0.0095
+const WALK_SPEED: f64 = 0.005
+const SPRINT_MULT: f64 = 1.6
+const MAX_FALL_SPEED: f64 = 0.06
+const MAX_DT_MS: f64 = 50.0
+const PLAYER_HALF_WIDTH: f64 = 0.3
+const PLAYER_HEIGHT: f64 = 1.8
+const EYE_HEIGHT: f64 = 1.62
+const DOUBLE_TAP_MS: u16 = 250
+
+const BREAK_TIME_MS: f64 = 500.0
+
 const BG_COLOR = glm.vec3(0.58, 0.83, 0.99)
 
 const SAND: u8 = 1

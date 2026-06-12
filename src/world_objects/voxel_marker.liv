@@ -23,6 +23,7 @@ impl VoxelMarker:
 
     fn set_uniform(self: &mut VoxelMarker):
         self.mesh.base.program['m_model'].write(self.get_model_matrix())
+        self.mesh.base.program['u_progress'] = self.handler.break_progress as float
 
     fn get_model_matrix(self: &VoxelMarker) -> PyObject:
         glm.translate(glm.mat4(), glm.vec3(self.position))

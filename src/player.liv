@@ -1,8 +1,8 @@
 from settings import *
 from camera import Camera
 
+import math
 import py "pygame" as pg
-import py "operator" as op
 import py "glm" as glm
 
 struct Player:
@@ -15,6 +15,15 @@ struct Player:
     shift_down: bool
     space_down: bool
     ctrl_down: bool
+    flying: bool
+    noclip: bool
+    on_ground: bool
+    velocity_y: f64
+    last_space_ms: int
+    breaking: bool
+    break_x: int
+    break_y: int
+    break_z: int
 
 impl Player:
     fn __init__(self, app: &mut VoxelEngine, camera: &mut Camera):
@@ -27,22 +36,41 @@ impl Player:
         self.shift_down = False
         self.space_down = False
         self.ctrl_down = False
+        self.flying = False
+        self.noclip = False
+        self.on_ground = False
+        self.velocity_y = 0.0
+        self.last_space_ms = -100000
+        self.breaking = False
+        self.break_x = 0
+        self.break_y = 0
+        self.break_z = 0
 
     fn update(self: &mut Player, dt: PyObject):
-        self.keyboard_control(dt)
+        let mut dt_ms = (dt as float) as f64
+        if dt_ms > MAX_DT_MS:
+            dt_ms = MAX_DT_MS
+        self.keyboard_control(dt_ms)
         self.mouse_control()
+        self.update_breaking(dt_ms)
         self.camera.update()
 
     fn handle_event(self: &mut Player, event: PyObject):
         if event.type == pg.MOUSEBUTTONDOWN:
             if event.button == 1:
-                self.app.scene.world.voxel_handler.remove_voxel()
+                self.breaking = True
             if event.button == 3:
                 self.app.scene.world.voxel_handler.add_voxel()
+
+        if event.type == pg.MOUSEBUTTONUP:
+            if event.button == 1:
+                self.breaking = False
 
         if event.type == pg.KEYDOWN:
             if event.key >= pg.K_1 and event.key <= pg.K_7:
                 self.app.scene.world.voxel_handler.new_voxel_id = (event.key - pg.K_0) as int
+            if event.key == pg.K_BACKSLASH:
+                self.noclip = not self.noclip
             if event.key == pg.K_w:
                 self.w_down = True
             if event.key == pg.K_s:
@@ -55,6 +83,13 @@ impl Player:
                 self.shift_down = True
             if event.key == pg.K_SPACE:
                 self.space_down = True
+                let now = pg.time.get_ticks() as int
+                if now - self.last_space_ms < (DOUBLE_TAP_MS as int):
+                    self.flying = not self.flying
+                    self.velocity_y = 0.0
+                    self.last_space_ms = -100000
+                else:
+                    self.last_space_ms = now
             if event.key == pg.K_LCTRL:
                 self.ctrl_down = True
 
@@ -82,21 +117,178 @@ impl Player:
         self.camera.rotate_yaw(dx * sensitivity)
         self.camera.rotate_pitch(dy * sensitivity)
 
-    fn keyboard_control(self: &mut Player, dt: PyObject):
-        let vel = op.mul(PLAYER_SPEED as float, dt)
-        let mut move_vel = vel
-        if self.shift_down:
-            move_vel = op.mul(vel, 3.0 as float)
-        if self.w_down:
-            self.camera.position = op.add(self.camera.position, op.mul(self.camera.forward, move_vel))
-        if self.s_down:
-            self.camera.position = op.sub(self.camera.position, op.mul(self.camera.forward, move_vel))
-        if self.d_down:
-            self.camera.position = op.add(self.camera.position, op.mul(self.camera.right, move_vel))
-        if self.a_down:
-            self.camera.position = op.sub(self.camera.position, op.mul(self.camera.right, move_vel))
-        let world_up = glm.vec3(0, 1, 0)
-        if self.space_down:
-            self.camera.position = op.add(self.camera.position, op.mul(world_up, move_vel))
-        if self.ctrl_down:
-            self.camera.position = op.sub(self.camera.position, op.mul(world_up, move_vel))
+    fn keyboard_control(self: &mut Player, dt_ms: f64):
+        let mut px = (self.camera.position[0] as float) as f64
+        let mut py = (self.camera.position[1] as float) as f64
+        let mut pz = (self.camera.position[2] as float) as f64
+
+        let mut dx = 0.0
+        let mut dy = 0.0
+        let mut dz = 0.0
+
+        if self.flying or self.noclip:
+            let mut vel = ((PLAYER_SPEED as float) as f64) * dt_ms
+            if self.shift_down:
+                vel = vel * 3.0
+            let fx = (self.camera.forward[0] as float) as f64
+            let fy = (self.camera.forward[1] as float) as f64
+            let fz = (self.camera.forward[2] as float) as f64
+            let rx = (self.camera.right[0] as float) as f64
+            let rz = (self.camera.right[2] as float) as f64
+            if self.w_down:
+                dx = dx + fx * vel
+                dy = dy + fy * vel
+                dz = dz + fz * vel
+            if self.s_down:
+                dx = dx - fx * vel
+                dy = dy - fy * vel
+                dz = dz - fz * vel
+            if self.d_down:
+                dx = dx + rx * vel
+                dz = dz + rz * vel
+            if self.a_down:
+                dx = dx - rx * vel
+                dz = dz - rz * vel
+            if self.space_down:
+                dy = dy + vel
+            if self.ctrl_down:
+                dy = dy - vel
+            self.velocity_y = 0.0
+            self.on_ground = False
+        else:
+            let fx = (self.camera.forward[0] as float) as f64
+            let fz = (self.camera.forward[2] as float) as f64
+            let rx = (self.camera.right[0] as float) as f64
+            let rz = (self.camera.right[2] as float) as f64
+            let mut flen = math.sqrt(fx * fx + fz * fz)
+            if flen < 0.000001:
+                flen = 1.0
+            let nfx = fx / flen
+            let nfz = fz / flen
+            let mut hx = 0.0
+            let mut hz = 0.0
+            if self.w_down:
+                hx = hx + nfx
+                hz = hz + nfz
+            if self.s_down:
+                hx = hx - nfx
+                hz = hz - nfz
+            if self.d_down:
+                hx = hx + rx
+                hz = hz + rz
+            if self.a_down:
+                hx = hx - rx
+                hz = hz - rz
+            let hlen = math.sqrt(hx * hx + hz * hz)
+            if hlen > 0.000001:
+                let mut speed = WALK_SPEED * dt_ms
+                if self.shift_down:
+                    speed = speed * SPRINT_MULT
+                dx = (hx / hlen) * speed
+                dz = (hz / hlen) * speed
+            if self.space_down and self.on_ground:
+                self.velocity_y = JUMP_SPEED
+            self.velocity_y = self.velocity_y - GRAVITY * dt_ms
+            if self.velocity_y < 0.0 - MAX_FALL_SPEED:
+                self.velocity_y = 0.0 - MAX_FALL_SPEED
+            dy = self.velocity_y * dt_ms
+
+        if self.noclip:
+            px = px + dx
+            py = py + dy
+            pz = pz + dz
+        else:
+            // Substep so a single step never exceeds half a voxel,
+            // otherwise fast falls tunnel through thin terrain.
+            let mut adx = dx
+            if adx < 0.0:
+                adx = 0.0 - adx
+            let mut ady = dy
+            if ady < 0.0:
+                ady = 0.0 - ady
+            let mut adz = dz
+            if adz < 0.0:
+                adz = 0.0 - adz
+            let mut maxd = adx
+            if ady > maxd:
+                maxd = ady
+            if adz > maxd:
+                maxd = adz
+            let steps = ((maxd / 0.5) as int) + 1
+            let sx = dx / (steps as f64)
+            let sy = dy / (steps as f64)
+            let sz = dz / (steps as f64)
+
+            self.on_ground = False
+            let mut step_i = 0
+            while step_i < steps:
+                // Move and resolve one axis at a time so sliding along
+                // walls works without getting stuck on corners.
+                px = px + sx
+                if self.collides(px, py, pz):
+                    if sx > 0.0:
+                        px = (ifloor(px + PLAYER_HALF_WIDTH) as f64) - PLAYER_HALF_WIDTH - 0.001
+                    else:
+                        px = (ifloor(px - PLAYER_HALF_WIDTH) as f64) + 1.0 + PLAYER_HALF_WIDTH + 0.001
+                pz = pz + sz
+                if self.collides(px, py, pz):
+                    if sz > 0.0:
+                        pz = (ifloor(pz + PLAYER_HALF_WIDTH) as f64) - PLAYER_HALF_WIDTH - 0.001
+                    else:
+                        pz = (ifloor(pz - PLAYER_HALF_WIDTH) as f64) + 1.0 + PLAYER_HALF_WIDTH + 0.001
+                py = py + sy
+                if self.collides(px, py, pz):
+                    if sy < 0.0:
+                        py = (ifloor(py - EYE_HEIGHT) as f64) + 1.0 + EYE_HEIGHT + 0.001
+                        self.on_ground = True
+                    else:
+                        py = (ifloor(py - EYE_HEIGHT + PLAYER_HEIGHT) as f64) - PLAYER_HEIGHT + EYE_HEIGHT - 0.001
+                    self.velocity_y = 0.0
+                step_i = step_i + 1
+
+        self.camera.position = glm.vec3(px, py, pz)
+
+    fn collides(self: &Player, px: f64, py: f64, pz: f64) -> bool:
+        let x0 = ifloor(px - PLAYER_HALF_WIDTH)
+        let x1 = ifloor(px + PLAYER_HALF_WIDTH)
+        let y0 = ifloor(py - EYE_HEIGHT)
+        let y1 = ifloor(py - EYE_HEIGHT + PLAYER_HEIGHT)
+        let z0 = ifloor(pz - PLAYER_HALF_WIDTH)
+        let z1 = ifloor(pz + PLAYER_HALF_WIDTH)
+        let mut x = x0
+        while x <= x1:
+            let mut y = y0
+            while y <= y1:
+                let mut z = z0
+                while z <= z1:
+                    if self.app.scene.world.voxel_handler.is_solid(x, y, z):
+                        return True
+                    z = z + 1
+                y = y + 1
+            x = x + 1
+        False
+
+    fn update_breaking(self: &mut Player, dt_ms: f64):
+        if self.breaking and self.app.scene.world.voxel_handler.voxel_id != 0:
+            let wx = self.app.scene.world.voxel_handler.voxel_world_pos[0] as int
+            let wy = self.app.scene.world.voxel_handler.voxel_world_pos[1] as int
+            let wz = self.app.scene.world.voxel_handler.voxel_world_pos[2] as int
+            if wx == self.break_x and wy == self.break_y and wz == self.break_z:
+                let mut progress = self.app.scene.world.voxel_handler.break_progress + dt_ms / BREAK_TIME_MS
+                if progress >= 1.0:
+                    self.app.scene.world.voxel_handler.remove_voxel()
+                    progress = 0.0
+                self.app.scene.world.voxel_handler.break_progress = progress
+            else:
+                self.break_x = wx
+                self.break_y = wy
+                self.break_z = wz
+                self.app.scene.world.voxel_handler.break_progress = 0.0
+        else:
+            self.app.scene.world.voxel_handler.break_progress = 0.0
+
+fn ifloor(v: f64) -> int:
+    let i = v as int
+    if (i as f64) > v:
+        return i - 1
+    i
