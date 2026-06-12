@@ -88,3 +88,4 @@ const CLOUD_SCALE: u8 = 25
 const CLOUD_W: u16 = 960
 const CLOUD_CENTER: u16 = CLOUD_W / 2
 const CLOUD_HEIGHT: u8 = WORLD_H * CHUNK_SIZE * 2
+const CLOUD_THICKNESS: u8 = 5

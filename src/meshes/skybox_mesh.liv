@@ -1,0 +1,11 @@
+import py "builtins" as builtins
+
+struct SkyboxMesh:
+    vao: PyObject
+
+impl SkyboxMesh:
+    fn __init__(self, app: &mut VoxelEngine):
+        self.vao = app.ctx.vertex_array(app.shader_program.skybox, builtins.list())
+
+    fn render(self: &SkyboxMesh):
+        self.vao.render(vertices=3)

@@ -10,6 +10,7 @@ struct ShaderProgram:
     clouds: PyObject
     crosshair: PyObject
     hotbar: PyObject
+    skybox: PyObject
 
 impl ShaderProgram:
     fn __init__(self, engine: &mut VoxelEngine):
@@ -22,6 +23,7 @@ impl ShaderProgram:
         self.clouds = self.get_program(shader_name='clouds')
         self.crosshair = self.get_program(shader_name='crosshair')
         self.hotbar = self.get_program(shader_name='hotbar')
+        self.skybox = self.get_program(shader_name='skybox')
 
         self.set_uniforms_on_init()
 
@@ -52,6 +54,13 @@ impl ShaderProgram:
         self.hotbar['u_texture_array_0'] = 1
         self.hotbar['u_selected'] = 0.0
 
+        self.skybox['bg_color'].write(BG_COLOR)
+        self.write_sky_tan()
+
+    fn write_sky_tan(self: &mut ShaderProgram):
+        let frustum = &self.engine.player.camera.frustum
+        self.skybox['u_tan'].write(glm.vec2(frustum.tan_x, frustum.tan_y))
+
     fn set_screen_uniforms(self: &mut ShaderProgram, width: f64, height: f64):
         let px_per_unit = 2.0
         let sx = 2.0 * px_per_unit / width
@@ -73,7 +82,11 @@ impl ShaderProgram:
             self.voxel_marker['m_proj'].write(self.engine.player.camera.m_proj)
             self.water['m_proj'].write(self.engine.player.camera.m_proj)
             self.clouds['m_proj'].write(self.engine.player.camera.m_proj)
+            self.write_sky_tan()
             self.engine.player.camera.proj_dirty = False
+        self.skybox['u_forward'].write(self.engine.player.camera.forward)
+        self.skybox['u_right'].write(self.engine.player.camera.right)
+        self.skybox['u_up'].write(self.engine.player.camera.up)
         self.chunk['m_view'].write(self.engine.player.camera.m_view)
         self.voxel_marker['m_view'].write(self.engine.player.camera.m_view)
         self.water['m_view'].write(self.engine.player.camera.m_view)

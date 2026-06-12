@@ -4,6 +4,7 @@ from world_objects.water import Water
 from world_objects.voxel_marker import VoxelMarker
 from meshes.crosshair_mesh import CrosshairMesh
 from meshes.hotbar_mesh import HotbarMesh
+from meshes.skybox_mesh import SkyboxMesh
 
 import py "moderngl" as mgl
 
@@ -14,6 +15,7 @@ struct Scene:
     voxel_marker: VoxelMarker
     crosshair: CrosshairMesh
     hotbar: HotbarMesh
+    skybox: SkyboxMesh
 
 impl Scene:
     fn __init__(self, app: &mut VoxelEngine):
@@ -23,6 +25,7 @@ impl Scene:
         self.voxel_marker = VoxelMarker(&mut self.world.voxel_handler)
         self.crosshair = CrosshairMesh(app)
         self.hotbar = HotbarMesh(app)
+        self.skybox = SkyboxMesh(app)
 
     fn update(self: &mut Scene):
         self.world.update()
@@ -30,9 +33,13 @@ impl Scene:
         self.clouds.update()
 
     fn render(self: &mut Scene):
+        let ctx = self.water.app.ctx
+        ctx.disable(mgl.DEPTH_TEST)
+        self.skybox.render()
+        ctx.enable(mgl.DEPTH_TEST)
         self.world.render()
-        self.water.app.ctx.disable(mgl.CULL_FACE)
         self.clouds.render()
+        self.water.app.ctx.disable(mgl.CULL_FACE)
         self.water.render()
         self.water.app.ctx.enable(mgl.CULL_FACE)
         self.voxel_marker.render()
