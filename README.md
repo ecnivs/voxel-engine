@@ -50,7 +50,7 @@ Olive handles all the game logic. Rendering goes through pygame and ModernGL via
 |-------|--------|
 | Left Click | Remove targeted block (hold to break) |
 | Right Click | Place selected block |
-| 1 – 7 | Select block type (Sand / Grass / Dirt / Stone / Snow / Leaves / Wood) |
+| 1-7 | Select block type (Sand / Grass / Dirt / Stone / Snow / Leaves / Wood) |
 | Scroll Wheel | Cycle block type |
 
 #### Other
